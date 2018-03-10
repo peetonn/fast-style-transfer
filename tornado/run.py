@@ -38,8 +38,7 @@ import moviepy.video.io.ffmpeg_writer as ffmpeg_writer
 BATCH_SIZE = 4
 DEVICE = '/gpu:0'
 
-# port = 8889
-port = 8890
+port = 8889
 ipaddress = "131.179.142.7"
 hostUrl = "http://"+ipaddress+":"+str(port)
 define("port", default=port, help="run on the given port", type=int)
@@ -49,7 +48,9 @@ sampleImg = None
 sampleImgW = None
 sampleImgH = None
 quit = False
-requestQueue = Queue()
+debug = False
+
+workerQueues = {}
 
 #******************************************************************************
 def timestampMs():
@@ -72,6 +73,7 @@ class IndexHandler(tornado.web.RequestHandler):
         
 class UploadHandler(tornado.web.RequestHandler):
     def post(self):
+        global workerQueues, debug
         print("New upload request "+str(self.request))
 
         fileData = self.request.files['file'][0]
@@ -82,10 +84,22 @@ class UploadHandler(tornado.web.RequestHandler):
         imageFile = open(fname, 'w')
         imageFile.write(fileData['body'])
 
-        requestQueue.put(fileID)
-        print("Submitted request " + fileID + " for segmentation processing");
-
-        self.finish(hostUrl+"/result/"+fileID+".png")
+        print(workerQueues)
+        if not debug:
+            for m in workerQueues:
+                workerQueues[m].put(fileID)
+                print("Submitted request " + fileID + " for segmentation processing with style "+modelName);
+                self.finish(hostUrl+"/result/"+fileID+".png")
+        else:
+            modelName = self.get_argument('style', True)
+            if modelName in workerQueues:
+                workerQueues[modelName].put(fileID)
+                print("Submitted request " + fileID + " for segmentation processing with style "+modelName);
+                self.finish(hostUrl+"/result/"+fileID+".png")
+            else:
+                print("Submitted style is not supported: ", modelName)
+                self.set_status(406)
+                self.finish("Style not supported: "+ modelName)
 
 class InfoHandler(tornado.web.RequestHandler):
     def get(self):
@@ -96,7 +110,7 @@ class InfoHandler(tornado.web.RequestHandler):
             })
         self.finish(infoString)
 
-def fstWorker(sampleImg, checkpoint_dir, device_t='/gpu:0'):
+def fstWorker(requestQueue, sampleImg, checkpoint_dir, device_t='/gpu:0'):
     global sampleImgH, sampleImgW
     modelName = os.path.basename(checkpoint_dir)
     print("Starting worker with model "+modelName+" on GPU "+device_t + "...")
@@ -204,12 +218,22 @@ def signal_handler(signum, frame):
     quit = True
 
 def main():
-    global allModels, sampleImg, sampleImgW, sampleImgH
+    global allModels, sampleImg, sampleImgW, sampleImgH, port, workerQueues, debug
     signal.signal(signal.SIGINT, signal_handler)
-    allModels = ["mixed-media-7"] #os.listdir(modelsDir)
+    if len(sys.argv) > 1 and sys.argv[1] == 'debug':
+        debug = True
+        port = 8890
+        print("**********DEBUG MODE************************************************************")
+        print("Portnumber: "+str(port))
+    # allModels = ["mixed-media-7"] 
+    allModels = os.listdir(modelsDir)
 
     # TODO: this can be expanded to utilize more than one GPU
     nGpus = 1
+    for m in allModels:
+        workerQueues[m] = Queue()
+        print("Added queue for "+m)
+
     workers = {}
     nWorkers = len(allModels)
     sampleImgName = 'sample420x236.jpg'
@@ -226,18 +250,18 @@ def main():
     for i in range(0,nWorkers):
         modelName = allModels[i]
         checkpoint = os.path.join(modelsDir, modelName)
-        worker = Thread(target=fstWorker, args=(sampleImg, checkpoint, ))
+        worker = Thread(target=fstWorker, args=(workerQueues[modelName], sampleImg, checkpoint, ))
         worker.start()
         workers[modelName] = worker
 
     http_server = tornado.httpserver.HTTPServer(Application())
-    http_server.listen(options.port)
+    http_server.listen(port)
     tornado.ioloop.IOLoop.instance().start()
     
     print("Will terminate GPU workers...")
 
-    for k in workers:
-        requestQueue.put("quit-"+str(k))
+    for m in allModels:
+        workerQueues[m].put("quit-"+str(m))
 
 if __name__ == "__main__":
     main()
