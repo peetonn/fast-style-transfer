@@ -17,7 +17,7 @@ from tornado.options import define, options
 from Queue import Queue
 from threading import Thread
 from datetime import datetime
-
+import re
 import time
 import datetime
 from PIL import Image
@@ -43,6 +43,10 @@ ipaddress = "131.179.142.7"
 hostUrl = "http://"+ipaddress+":"+str(port)
 define("port", default=port, help="run on the given port", type=int)
 
+allModels = []
+sampleImg = None
+sampleImgW = None
+sampleImgH = None
 quit = False
 requestQueue = Queue()
 
@@ -55,13 +59,15 @@ class Application(tornado.web.Application):
         handlers = [
             (r"/", IndexHandler),
             (r"/upload", UploadHandler),
-            (r"/result/(.*)", tornado.web.StaticFileHandler, {"path" : "./results"})
+            (r"/result/(.*)", tornado.web.StaticFileHandler, {"path" : "./results"}),
+            (r"/info", InfoHandler)
         ]
         tornado.web.Application.__init__(self, handlers)
         
 class IndexHandler(tornado.web.RequestHandler):
     def get(self):
-        self.render("upload_form.html")
+        global allModels
+        self.render("upload_form.html", imageWidth = sampleImgW, imageHeight = sampleImgH, models=allModels)
         
 class UploadHandler(tornado.web.RequestHandler):
     def post(self):
@@ -79,6 +85,15 @@ class UploadHandler(tornado.web.RequestHandler):
         print("Submitted request " + fileID + " for segmentation processing");
 
         self.finish(hostUrl+"/result/"+fileID+".png")
+
+class InfoHandler(tornado.web.RequestHandler):
+    def get(self):
+        global allModels, sampleImgW, sampleImgH
+        infoString = json.dumps({ \
+            'models': allModels, \
+            'res': { 'w': sampleImgW, 'h' : sampleImgH} \
+            })
+        self.finish(infoString)
 
 def fstWorker(sampleImg, checkpoint_dir, device_t='/gpu:0'):
     modelName = os.path.basename(checkpoint_dir)
@@ -183,17 +198,27 @@ def signal_handler(signum, frame):
     quit = True
 
 def main():
+    global allModels, sampleImg, sampleImgW, sampleImgH
     signal.signal(signal.SIGINT, signal_handler)
-    models = os.listdir(modelsDir)
+    allModels = ["mixed-media-7"] #os.listdir(modelsDir)
 
     # TODO: this can be expanded to utilize more than one GPU
     nGpus = 1
     workers = {}
-    nWorkers = 1 #len(models)
-    # sampleImg = os.path.join(rootPath, 'sample840x560.jpg')
-    sampleImg = os.path.join(rootPath, 'sample420x280.jpg')
+    nWorkers = len(allModels)
+    sampleImgName = 'sample420x236.jpg'
+    # sampleImgName = 'sample840x560.jpg'
+    # sampleImgName = 'sample420x280.jpg'
+    sampleImg = os.path.join(rootPath, sampleImgName)
+    pat = '\D*(?P<w>[0-9]+)x(?P<h>[0-9]+).jpg'
+    r  = re.compile(pat)
+    m = r.match(sampleImg)
+    if m:
+        sampleImgW = int(m.group('w'))
+        sampleImgH = int(m.group('h'))
+
     for i in range(0,nWorkers):
-        modelName = models[i]
+        modelName = allModels[i]
         checkpoint = os.path.join(modelsDir, modelName)
         worker = Thread(target=fstWorker, args=(sampleImg, checkpoint, ))
         worker.start()
