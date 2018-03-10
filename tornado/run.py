@@ -38,7 +38,8 @@ import moviepy.video.io.ffmpeg_writer as ffmpeg_writer
 BATCH_SIZE = 4
 DEVICE = '/gpu:0'
 
-port = 8889
+# port = 8889
+port = 8890
 ipaddress = "131.179.142.7"
 hostUrl = "http://"+ipaddress+":"+str(port)
 define("port", default=port, help="run on the given port", type=int)
@@ -96,11 +97,13 @@ class InfoHandler(tornado.web.RequestHandler):
         self.finish(infoString)
 
 def fstWorker(sampleImg, checkpoint_dir, device_t='/gpu:0'):
+    global sampleImgH, sampleImgW
     modelName = os.path.basename(checkpoint_dir)
     print("Starting worker with model "+modelName+" on GPU "+device_t + "...")
 
     def printWorker(msg):
          print(str(timestampMs())+" [gpu-worker-"+ modelName+"] " + msg)
+
     img_shape = get_img(sampleImg).shape
 
     g = tf.Graph()
@@ -139,17 +142,20 @@ def fstWorker(sampleImg, checkpoint_dir, device_t='/gpu:0'):
             printWorker("Reading image "+path)
             img = get_img(path)
 
-            printWorker("Running style transfer...")
-            X = np.zeros(batch_shape, dtype=np.float32)
-            X[0] = img
-            _preds = sess.run(preds, feed_dict={img_placeholder:X})
+            if img.shape[0] != sampleImgH or img.shape[1] != sampleImgW:
+                print("Incoming image size does not match configured size")
+            else:
+                printWorker("Running style transfer...")
+                X = np.zeros(batch_shape, dtype=np.float32)
+                X[0] = img
+                _preds = sess.run(preds, feed_dict={img_placeholder:X})
 
-            pathOut = os.path.join(resultsPath, fileId+".png")
-            save_img(pathOut, _preds[0])
-            t2 = timestampMs()
+                pathOut = os.path.join(resultsPath, fileId+".png")
+                save_img(pathOut, _preds[0])
+                t2 = timestampMs()
 
-            printWorker("Saved result at "+pathOut)
-            printWorker("Processing took "+str(t2-t1)+"ms")
+                printWorker("Saved result at "+pathOut)
+                printWorker("Processing took "+str(t2-t1)+"ms")
 
     printWorker("Completed")
 
