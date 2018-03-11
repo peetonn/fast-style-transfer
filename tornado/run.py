@@ -63,7 +63,8 @@ class Application(tornado.web.Application):
             (r"/", IndexHandler),
             (r"/upload", UploadHandler),
             (r"/result/(.*)", tornado.web.StaticFileHandler, {"path" : "./results"}),
-            (r"/info", InfoHandler)
+            (r"/info", InfoHandler),
+            (r"/status", StatusHandler)
         ]
         tornado.web.Application.__init__(self, handlers)
         
@@ -106,6 +107,10 @@ class InfoHandler(tornado.web.RequestHandler):
             'res': { 'w': sampleImgW, 'h' : sampleImgH} \
             })
         self.finish(infoString)
+
+class StatusHandler(tornado.web.RequestHandler):
+    def get(self):
+        self.finish("ok")
 
 def fstWorker(requestQueue, sampleImg, checkpoint_dir, device_t='/gpu:0'):
     global sampleImgH, sampleImgW
@@ -222,7 +227,7 @@ def main():
         port = 8890
         print("**********DEBUG MODE************************************************************")
         print("Portnumber: "+str(port))
-    # allModels = ["mixed-media-7"] 
+    # allModels = ["mixed-media-7"]
     modelsList = os.listdir(modelsDir)
     # this is a hack for pre-trained author's models
     # they are just single files with extension .ckpt
@@ -232,7 +237,7 @@ def main():
         files = os.listdir(os.path.join(modelsDir, m))
         if len(files) > 1: # that's our models
             allModels.append(m)
-        else:
+        elif len(files) == 1:
             allModels.append(os.path.join(m, files[0]))
 
     # TODO: this can be expanded to utilize more than one GPU
@@ -270,7 +275,8 @@ def main():
     print("Will terminate GPU workers...")
 
     for m in allModels:
-        workerQueues[m].put("quit-"+str(m))
+        k = os.path.basename(m)
+        workerQueues[k].put("quit-"+str(k))
 
 if __name__ == "__main__":
     main()
