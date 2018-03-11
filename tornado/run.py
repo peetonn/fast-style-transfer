@@ -32,6 +32,7 @@ import time
 import json
 import subprocess
 import numpy
+import glob
 from moviepy.video.io.VideoFileClip import VideoFileClip
 import moviepy.video.io.ffmpeg_writer as ffmpeg_writer
 
@@ -101,7 +102,7 @@ class InfoHandler(tornado.web.RequestHandler):
     def get(self):
         global allModels, sampleImgW, sampleImgH
         infoString = json.dumps({ \
-            'models': allModels, \
+            'models': [os.path.basename(x) for x in allModels], \
             'res': { 'w': sampleImgW, 'h' : sampleImgH} \
             })
         self.finish(infoString)
@@ -134,7 +135,7 @@ def fstWorker(requestQueue, sampleImg, checkpoint_dir, device_t='/gpu:0'):
             if ckpt and ckpt.model_checkpoint_path:
                 saver.restore(sess, ckpt.model_checkpoint_path)
             else:
-                raise Exception("No checkpoint found...")
+                raise Exception("No checkpoint found at "+checkpoint_dir)
         else:
             saver.restore(sess, checkpoint_dir)
 
@@ -222,13 +223,24 @@ def main():
         print("**********DEBUG MODE************************************************************")
         print("Portnumber: "+str(port))
     # allModels = ["mixed-media-7"] 
-    allModels = os.listdir(modelsDir)
+    modelsList = os.listdir(modelsDir)
+    # this is a hack for pre-trained author's models
+    # they are just single files with extension .ckpt
+    authorModels = glob.glob(os.path.join(modelsDir, '*', '*.ckpt'))
+    allModels = []
+    for m in modelsList:
+        files = os.listdir(os.path.join(modelsDir, m))
+        if len(files) > 1: # that's our models
+            allModels.append(m)
+        else:
+            allModels.append(os.path.join(m, files[0]))
 
     # TODO: this can be expanded to utilize more than one GPU
     nGpus = 1
     for m in allModels:
-        workerQueues[m] = Queue()
-        print("Added queue for "+m)
+        k = os.path.basename(m)
+        workerQueues[k] = Queue()
+        print("Added queue for "+k)
 
     workers = {}
     nWorkers = len(allModels)
@@ -245,10 +257,11 @@ def main():
 
     for i in range(0,nWorkers):
         modelName = allModels[i]
+        k = os.path.basename(modelName)
         checkpoint = os.path.join(modelsDir, modelName)
-        worker = Thread(target=fstWorker, args=(workerQueues[modelName], sampleImg, checkpoint, ))
+        worker = Thread(target=fstWorker, args=(workerQueues[k], sampleImg, checkpoint, ))
         worker.start()
-        workers[modelName] = worker
+        workers[k] = worker
 
     http_server = tornado.httpserver.HTTPServer(Application())
     http_server.listen(port)
