@@ -84,22 +84,18 @@ class UploadHandler(tornado.web.RequestHandler):
         imageFile = open(fname, 'w')
         imageFile.write(fileData['body'])
 
-        print(workerQueues)
-        if not debug:
-            for m in workerQueues:
-                workerQueues[m].put(fileID)
-                print("Submitted request " + fileID + " for segmentation processing with style "+modelName);
-                self.finish(hostUrl+"/result/"+fileID+".png")
+        modelName = self.get_argument('style', True)
+        if isinstance(modelName, bool):
+            modelName = 'mixed-media-7'
+            print("Style was not specified. Using default "+modelName)
+        if modelName in workerQueues:
+            workerQueues[modelName].put(fileID)
+            print("Submitted request " + fileID + " for segmentation processing with style "+modelName);
+            self.finish(hostUrl+"/result/"+fileID+".png")
         else:
-            modelName = self.get_argument('style', True)
-            if modelName in workerQueues:
-                workerQueues[modelName].put(fileID)
-                print("Submitted request " + fileID + " for segmentation processing with style "+modelName);
-                self.finish(hostUrl+"/result/"+fileID+".png")
-            else:
-                print("Submitted style is not supported: ", modelName)
-                self.set_status(406)
-                self.finish("Style not supported: "+ modelName)
+            print("Submitted style is not supported: ", modelName)
+            self.set_status(406)
+            self.finish("Style not supported: "+ str(modelName))
 
 class InfoHandler(tornado.web.RequestHandler):
     def get(self):
