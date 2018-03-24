@@ -1,4 +1,4 @@
-# Semantic Image Segmentation Web Service
+# Fast Style Transfer Web Service
 
 This service is built atop [TensorFlow CNN for fast style transfer](https://github.com/lengstrom/fast-style-transfer) implementation. For detailed information, please refer to the README of this repo.
 
