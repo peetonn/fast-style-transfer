@@ -1,111 +1,109 @@
-## Fast Style Transfer in [TensorFlow](https://github.com/tensorflow/tensorflow)
+# Semantic Image Segmentation Web Service
 
-Add styles from famous paintings to any photo in a fraction of a second! [You can even style videos!](#video-stylization)
+This service is built atop [TensorFlow CNN for fast style transfer](https://github.com/lengstrom/fast-style-transfer) implementation. For detailed information, please refer to the README of this repo.
 
-<p align = 'center'>
-<img src = 'examples/style/udnie.jpg' height = '246px'>
-<img src = 'examples/content/stata.jpg' height = '246px'>
-<a href = 'examples/results/stata_udnie.jpg'><img src = 'examples/results/stata_udnie_header.jpg' width = '627px'></a>
-</p>
-<p align = 'center'>
-It takes 100ms on a 2015 Titan X to style the MIT Stata Center (1024×680) like Udnie, by Francis Picabia.
-</p>
+## Dependencies
 
-Our implementation is based off of a combination of Gatys' [A Neural Algorithm of Artistic Style](https://arxiv.org/abs/1508.06576), Johnson's [Perceptual Losses for Real-Time Style Transfer and Super-Resolution](http://cs.stanford.edu/people/jcjohns/eccv16/), and Ulyanov's [Instance Normalization](https://arxiv.org/abs/1607.08022). 
+* install [TensorFlow](https://www.tensorflow.org/install/install_linux) (as of 3/17/2018 production, TensorFlow 1.5.0 was used)
+* install requirements:
 
-## Video Stylization 
-Here we transformed every frame in a video, then combined the results. [Click to go to the full demo on YouTube!](https://www.youtube.com/watch?v=xVJwwWQlQ1o) The style here is Udnie, as above.
-<div align = 'center'>
-     <a href = 'https://www.youtube.com/watch?v=xVJwwWQlQ1o'>
-        <img src = 'examples/results/fox_udnie.gif' alt = 'Stylized fox video. Click to go to YouTube!' width = '800px' height = '400px'>
-     </a>
-</div>
-
-See how to generate these videos [here](#stylizing-video)!
-
-## Image Stylization
-We added styles from various paintings to a photo of Chicago. Click on thumbnails to see full applied style images.
-<div align='center'>
-<img src = 'examples/content/chicago.jpg' height="200px">
-</div>
-     
-<div align = 'center'>
-<a href = 'examples/style/wave.jpg'><img src = 'examples/thumbs/wave.jpg' height = '200px'></a>
-<img src = 'examples/results/chicago_wave.jpg' height = '200px'>
-<img src = 'examples/results/chicago_udnie.jpg' height = '200px'>
-<a href = 'examples/style/udnie.jpg'><img src = 'examples/thumbs/udnie.jpg' height = '200px'></a>
-<br>
-<a href = 'examples/style/rain_princess.jpg'><img src = 'examples/thumbs/rain_princess.jpg' height = '200px'></a>
-<img src = 'examples/results/chicago_rain_princess.jpg' height = '200px'>
-<img src = 'examples/results/chicago_la_muse.jpg' height = '200px'>
-<a href = 'examples/style/la_muse.jpg'><img src = 'examples/thumbs/la_muse.jpg' height = '200px'></a>
-
-<br>
-<a href = 'examples/style/the_shipwreck_of_the_minotaur.jpg'><img src = 'examples/thumbs/the_shipwreck_of_the_minotaur.jpg' height = '200px'></a>
-<img src = 'examples/results/chicago_wreck.jpg' height = '200px'>
-<img src = 'examples/results/chicago_the_scream.jpg' height = '200px'>
-<a href = 'examples/style/the_scream.jpg'><img src = 'examples/thumbs/the_scream.jpg' height = '200px'></a>
-</div>
-
-## Implementation Details
-Our implementation uses TensorFlow to train a fast style transfer network. We use roughly the same transformation network as described in Johnson, except that batch normalization is replaced with Ulyanov's instance normalization, and the scaling/offset of the output `tanh` layer is slightly different. We use a loss function close to the one described in Gatys, using VGG19 instead of VGG16 and typically using "shallower" layers than in Johnson's implementation (e.g. we use `relu1_1` rather than `relu1_2`). Empirically, this results in larger scale style features in transformations.
-
-## Documentation
-### Training Style Transfer Networks
-Use `style.py` to train a new style transfer network. Run `python style.py` to view all the possible parameters. Training takes 4-6 hours on a Maxwell Titan X. [More detailed documentation here](docs.md#stylepy). **Before you run this, you should run `setup.sh`**. Example usage:
-
-    python style.py --style path/to/style/img.jpg \
-      --checkpoint-dir checkpoint/path \
-      --test path/to/test/img.jpg \
-      --test-dir path/to/test/dir \
-      --content-weight 1.5e1 \
-      --checkpoint-iterations 1000 \
-      --batch-size 20
-
-### Evaluating Style Transfer Networks
-Use `evaluate.py` to evaluate a style transfer network. Run `python evaluate.py` to view all the possible parameters. Evaluation takes 100 ms per frame (when batch size is 1) on a Maxwell Titan X. [More detailed documentation here](docs.md#evaluatepy). Takes several seconds per frame on a CPU. **Models for evaluation are [located here](https://drive.google.com/drive/folders/0B9jhaT37ydSyRk9UX0wwX3BpMzQ?usp=sharing)**. Example usage:
-
-    python evaluate.py --checkpoint path/to/style/model.ckpt \
-      --in-path dir/of/test/imgs/ \
-      --out-path dir/for/results/
-
-### Stylizing Video
-Use `transform_video.py` to transfer style into a video. Run `python transform_video.py` to view all the possible parameters. Requires `ffmpeg`. [More detailed documentation here](docs.md#transform_videopy). Example usage:
-
-    python transform_video.py --in-path path/to/input/vid.mp4 \
-      --checkpoint path/to/style/model.ckpt \
-      --out-path out/video.mp4 \
-      --device /gpu:0 \
-      --batch-size 4
-
-### Requirements
-You will need the following to run the above:
-- TensorFlow 0.11.0
-- Python 2.7.9, Pillow 3.4.2, scipy 0.18.1, numpy 1.11.2
-- If you want to train (and don't want to wait for 4 months):
-  - A decent GPU
-  - All the required NVIDIA software to run TF on a GPU (cuda, etc)
-- ffmpeg 3.1.3 if you want to stylize video
-
-### Citation
 ```
-  @misc{engstrom2016faststyletransfer,
-    author = {Logan Engstrom},
-    title = {Fast Style Transfer},
-    year = {2016},
-    howpublished = {\url{https://github.com/lengstrom/fast-style-transfer/}},
-    note = {commit xxxxxxx}
-  }
+pip install pillow scipy numpy tornado
 ```
 
-### Attributions/Thanks
-- This project could not have happened without the advice (and GPU access) given by [Anish Athalye](http://www.anishathalye.com/). 
-  - The project also borrowed some code from Anish's [Neural Style](https://github.com/anishathalye/neural-style/)
-- Some readme/docs formatting was borrowed from Justin Johnson's [Fast Neural Style](https://github.com/jcjohnson/fast-neural-style)
-- The image of the Stata Center at the very beginning of the README was taken by [Juan Paulo](https://juanpaulo.me/)
+* in repo directory, create folders:
 
-### License
-Copyright (c) 2016 Logan Engstrom. Contact me for commercial use (email: engstrom at my university's domain dot edu). Free for research/noncommercial use, as long as proper attribution is given and this copyright notice is retained.
+```
+mkdir upload results
+```
 
-### Related Work
-- Michael Ramos ported this network [to use CoreML on iOS](https://medium.com/@rambossa/diy-prisma-fast-style-transfer-app-with-coreml-and-tensorflow-817c3b90dacd)
+* download pre-trained models from [here](https://drive.google.com/drive/folders/0B9jhaT37ydSyRk9UX0wwX3BpMzQ) (author's link) or ask *peter [at] remap [dot] ucla [dot] edu* for more models (10 more models trained by us); **save models into *ce-models* folder, each model into a separate subfolder, named accordingly to each model name**.
+
+    I.e. you should have folder structure, as follows:
+    `<repo-directory>`
+     * `ce-models`
+       * `style-model1`
+         * `<model file or files>`
+       * `style-model1`
+         * `<model file or files>`
+       * `...`
+
+
+## Configuration
+
+* Since I didn't have time to figure out how to get IP address from within the running tornado service, modify [tornado/run.py](tonrado/run.py#L43) to your current public IP of the machine where this service will run.
+* Unfortunately, once initialized, neural network can run only on one resolution. Thus, you need to decide which image resolution you will require and configure it accordingly in [tornado/run.py](tonrado/run.py#L266) file by choosing appropriate sample image. You can also add your own sample image for custom resoution.
+
+## Run
+
+Start service:
+
+```
+python tornado/run.py
+```
+
+## Check
+
+Go to `http://<ip-address>:8889` - you should be able to see upload page where you can upload an image for segmentation. Once uploaded, service will return URL which you'll need to poll for the result (or it will return **code 423** if service is busy processing previous upload).
+
+## API
+
+* `/result/<FILE-ID>` - returns 404 if result was not processed yet or not found or returns segmented image (PNG);
+* `/info` - returns JSON dictionary with keys:
+    * `models` - an array of currently supported style models;
+    * `res` - supported image resolution (dictionary with keys `w` and `h`);
+* `/status` - returns **ok** if service runs normally.
+
+## Handy 
+
+* `curl` command for uploading images:
+
+```
+curl -F "file=@<path to file>" http://<ip-address>:8889/upload?style=lion-1
+```
+
+* python code for uploading images, checking the result and saving it into a file:
+
+```
+import requests
+from time import sleep
+
+port = 8889
+ipaddress = <ip-address>
+hostUrl = "http://"+ipaddress+":"+str(port)
+
+uploadUrl = hostUrl+"/upload"
+
+def upload(fname):
+	imageFile = {'file': open(fname, 'rb')}
+     style = 'udnie.ckpt'
+	response = requests.post(uploadUrl, files=imageFile, params={'style':style})
+	if response.status_code == 200:
+		print("Upload successful.")
+		statusCode = 0
+		it = 0
+		maxIter = 10
+		maxWait = 2000
+		while statusCode != 200 and it < maxIter:
+			print("Fetching result "+str(it+1)+"/"+str(maxIter)+"...")
+			r = requests.get(response.text, stream=True)
+			statusCode = r.status_code
+			it += 1
+			if statusCode != 200:
+				sleep(float(maxWait)/float(maxIter))
+
+		if statusCode == 200:
+			fname = "./result.png"
+			with open(fname, 'wb') as f:
+				for chunk in r:
+					f.write(chunk)
+			print("saved result at "+fname)
+		else:
+			print("time out receiving result from the server")
+
+def main():
+	upload("./sample420x236.jpg")
+
+if __name__ == "__main__":
+	main()
+```
