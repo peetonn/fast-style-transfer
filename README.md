@@ -76,7 +76,7 @@ uploadUrl = hostUrl+"/upload"
 
 def upload(fname):
 	imageFile = {'file': open(fname, 'rb')}
-     style = 'udnie.ckpt'
+	style = 'udnie.ckpt'
 	response = requests.post(uploadUrl, files=imageFile, params={'style':style})
 	if response.status_code == 200:
 		print("Upload successful.")
@@ -90,7 +90,7 @@ def upload(fname):
 			statusCode = r.status_code
 			it += 1
 			if statusCode != 200:
-				sleep(float(maxWait)/float(maxIter))
+				sleep(float(maxWait)/float(maxIter)/1000)
 
 		if statusCode == 200:
 			fname = "./result.png"
