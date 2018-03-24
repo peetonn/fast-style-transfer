@@ -78,6 +78,18 @@ class UploadHandler(tornado.web.RequestHandler):
         global workerQueues, debug
         print("New upload request "+str(self.request))
 
+        modelName = self.get_argument('style', True)
+        if isinstance(modelName, bool):
+            modelName = 'mixed-media-7'
+            print("Style was not specified. Using default "+modelName)
+        
+        if modelName in workerQueues:
+            if workerQueues[modelName].qsize() > 0:
+                print("Pending request in progress... REPLY 423")
+                self.set_status(423)
+                self.finish("service is not available. try again later")
+                return
+
         fileData = self.request.files['file'][0]
         original_fname = fileData['filename']
         extension = os.path.splitext(original_fname)[1]
@@ -86,10 +98,6 @@ class UploadHandler(tornado.web.RequestHandler):
         imageFile = open(fname, 'w')
         imageFile.write(fileData['body'])
 
-        modelName = self.get_argument('style', True)
-        if isinstance(modelName, bool):
-            modelName = 'mixed-media-7'
-            print("Style was not specified. Using default "+modelName)
         if modelName in workerQueues:
             workerQueues[modelName].put(fileID)
             print("Submitted request " + fileID + " for segmentation processing with style "+modelName);
@@ -159,15 +167,18 @@ def fstWorker(requestQueue, sampleImg, checkpoint_dir, device_t='/gpu:0'):
             img = get_img(path)
 
             if img.shape[0] != sampleImgH or img.shape[1] != sampleImgW:
-                print("Incoming image size does not match configured size")
+                print("Incoming image " + str(img.shape[0]) + "x" + str(img.shape[1])+ " size does not match configured size " + str(sampleImgH) + "x" + str(sampleImgW))
             else:
                 printWorker("Running style transfer...")
                 X = np.zeros(batch_shape, dtype=np.float32)
                 X[0] = img
                 _preds = sess.run(preds, feed_dict={img_placeholder:X})
 
+                pathOutTmp = os.path.join(resultsPath, fileId+"-tmp.png")
+                save_img(pathOutTmp, _preds[0])
+
                 pathOut = os.path.join(resultsPath, fileId+".png")
-                save_img(pathOut, _preds[0])
+                os.rename(pathOutTmp, pathOut)
                 t2 = timestampMs()
 
                 printWorker("Saved result at "+pathOut)
@@ -249,6 +260,9 @@ def main():
 
     workers = {}
     nWorkers = len(allModels)
+    #sampleImgName = 'sample1620x1080.jpg'
+    #sampleImgName = 'sample1920x1080.jpg'
+    # sampleImgName = 'sample1280x720.jpg'
     sampleImgName = 'sample420x236.jpg'
     # sampleImgName = 'sample840x560.jpg'
     # sampleImgName = 'sample420x280.jpg'
